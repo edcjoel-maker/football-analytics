@@ -118,14 +118,31 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </header>
 <main>
   <div class="card">
-    <div class="card-title">&#128193; Importer une vid&#233;o</div>
-    <div id="drop-zone">
-      <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.wmv">
-      <div class="drop-icon">&#127916;</div>
-      <div class="drop-text">Glisse ta vid&#233;o ici</div>
-      <div class="drop-sub">ou clique pour s&#233;lectionner &middot; MP4, AVI, MOV, MKV</div>
+    <div class="card-title">&#128193; Importer un match</div>
+    
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <button id="tab-file" style="flex:1;padding:10px;background:var(--surface2);color:var(--accent);border:1px solid var(--accent);border-radius:8px;font-weight:600;cursor:pointer;">&#128190; Fichier vid&eacute;o</button>
+      <button id="tab-url" style="flex:1;padding:10px;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:8px;font-weight:600;cursor:pointer;">&#128279; Lien Veo (sans t&eacute;l&eacute;chargement)</button>
     </div>
-    <div id="file-name"><span>&#128249;</span><span id="file-name-text"></span><span id="file-size" style="margin-left:auto;color:var(--muted);font-size:12px"></span></div>
+
+    <div id="file-pane">
+      <div id="drop-zone">
+        <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.wmv">
+        <div class="drop-icon">&#127916;</div>
+        <div class="drop-text">Glisse ta vid&#233;o ici</div>
+        <div class="drop-sub">ou clique pour s&#233;lectionner &middot; MP4, AVI, MOV, MKV</div>
+      </div>
+      <div id="file-name"><span>&#128249;</span><span id="file-name-text"></span><span id="file-size" style="margin-left:auto;color:var(--muted);font-size:12px"></span></div>
+    </div>
+
+    <div id="url-pane" style="display:none;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;">
+        <label style="display:block;font-size:13px;color:var(--muted);margin-bottom:8px;">Colle ton lien Veo :</label>
+        <input type="text" id="url-input" placeholder="https://app.veo.co/matches/..." style="width:100%;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;">
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">&#9889; Le serveur extrait directement le flux vid&eacute;o sans que tu aies besoin de le t&eacute;l&eacute;charger sur ton Mac !</div>
+      </div>
+    </div>
+
     <div id="upload-bar-wrap">
       <div class="bar-label"><span>Envoi en cours...</span><span id="upload-pct-label">0%</span></div>
       <div class="bar-track"><div class="bar-fill" id="upload-bar-fill"></div></div>
@@ -227,11 +244,68 @@ function setFile(f){
   $('btn-analyze').disabled=false;
   $('error-box').classList.remove('show');
 }
-$('btn-analyze').addEventListener('click',startAnalysis);
+let activeMode = 'file';
+const tabFile = $('tab-file'), tabUrl = $('tab-url');
+const filePane = $('file-pane'), urlPane = $('url-pane');
+const urlInput = $('url-input');
+
+tabFile.addEventListener('click', () => {
+  activeMode = 'file';
+  tabFile.style.background = 'var(--surface2)'; tabFile.style.color = 'var(--accent)'; tabFile.style.borderColor = 'var(--accent)';
+  tabUrl.style.background = 'var(--surface)'; tabUrl.style.color = 'var(--muted)'; tabUrl.style.borderColor = 'var(--border)';
+  filePane.style.display = 'block'; urlPane.style.display = 'none';
+  $('btn-analyze').disabled = !selectedFile;
+});
+
+tabUrl.addEventListener('click', () => {
+  activeMode = 'url';
+  tabUrl.style.background = 'var(--surface2)'; tabUrl.style.color = 'var(--accent)'; tabUrl.style.borderColor = 'var(--accent)';
+  tabFile.style.background = 'var(--surface)'; tabFile.style.color = 'var(--muted)'; tabFile.style.borderColor = 'var(--border)';
+  filePane.style.display = 'none'; urlPane.style.display = 'block';
+  $('btn-analyze').disabled = !urlInput.value.trim();
+});
+
+urlInput.addEventListener('input', () => {
+  if (activeMode === 'url') {
+    $('btn-analyze').disabled = !urlInput.value.trim();
+  }
+});
+
+$('btn-analyze').addEventListener('click', startAnalysis);
+
 async function startAnalysis(){
-  if(!selectedFile)return;
-  $('btn-analyze').disabled=true;
+  $('btn-analyze').disabled = true;
   $('error-box').classList.remove('show');
+
+  if (activeMode === 'url') {
+    const u = urlInput.value.trim();
+    if (!u) return;
+    try {
+      toast("🔍 Extraction du match Veo en cours...", 3000);
+      const r = await fetch(API + '/analyze-url', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url: u})
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        showError(data.detail || "Erreur extraction lien");
+        $('btn-analyze').disabled = false;
+        return;
+      }
+      currentTaskId = data.task_id;
+      showProcessing(currentTaskId);
+      startPolling();
+      saveHistory(currentTaskId, "Match Veo (Lien)", 0);
+    } catch (err) {
+      showError("Impossible de joindre le serveur : " + err);
+      $('btn-analyze').disabled = false;
+    }
+    return;
+  }
+
+  // Mode Fichier local
+  if(!selectedFile)return;
   $('upload-bar-wrap').classList.add('show');
   $('upload-bar-fill').style.width='0%';
   $('upload-pct-label').textContent='0%';
@@ -252,7 +326,7 @@ async function startAnalysis(){
   };
   xhr.onerror=()=>{
     $('upload-bar-wrap').classList.remove('show');
-    showError("Impossible de joindre le serveur. V\u00e9rifie qu'il est bien lanc\u00e9.");
+    showError("Impossible de joindre le serveur. Vérifie qu'il est bien lancé.");
     $('btn-analyze').disabled=false;
   };
   xhr.send(fd);

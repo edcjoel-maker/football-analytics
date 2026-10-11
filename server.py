@@ -91,6 +91,63 @@ async def health():
                                   if t["status"] not in (TaskStatus.DONE, TaskStatus.ERROR)])}
 
 
+def extract_veo_stream_url(url: str) -> str:
+    """
+    Extrait le flux vidéo direct depuis une URL de match Veo
+    (ex: https://app.veo.co/matches/20260929-untitled-recording-2026-09-29_22-38-52-v61cb888/)
+    """
+    import urllib.request, re, json
+    # Si c'est déjà un lien direct .mp4 ou autre
+    if url.lower().endswith(".mp4") or "video.mp4" in url:
+        return url
+
+    # Match Veo slug
+    m = re.search(r'matches/([a-zA-Z0-9_\-]+)', url)
+    if not m:
+        return url
+
+    slug = m.group(1).rstrip("/")
+    api_url = f"https://app.veo.co/api/app/matches/{slug}/"
+    req = urllib.request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    rec_id = data.get("identifier")
+    thumb = data.get("thumbnail") or ""
+    # Format thumbnail : https://c.veocdn.com/{rec_id}/standard/machine/{hash}/thumbnail.jpg
+    hm = re.search(r'/standard/machine/([^/]+)/thumbnail\.jpg', thumb)
+    if hm and rec_id:
+        vhash = hm.group(1)
+        return f"https://c.veocdn.com/{rec_id}/standard/machine/{vhash}/video.mp4"
+
+    # Fallback reel_url si dispo
+    if data.get("reel_url"):
+        return data["reel_url"]
+
+    return url
+
+
+@app.post("/analyze-url")
+async def analyze_url(background_tasks: BackgroundTasks,
+                      payload: dict):
+    """Reçoit une URL Veo ou vidéo directe et lance l'analyse sans téléchargement manuel."""
+    url = (payload.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "URL requise")
+
+    try:
+        video_stream_url = extract_veo_stream_url(url)
+    except Exception as e:
+        raise HTTPException(400, f"Impossible d'extraire la vidéo depuis ce lien Veo : {e}")
+
+    tid   = str(uuid.uuid4())
+    log.info(f"[{tid}] Analyse lancée depuis URL : {url} -> {video_stream_url}")
+    TASKS[tid] = make_task(tid, video_stream_url)
+    background_tasks.add_task(run_pipeline, tid)
+    return {"task_id": tid, "source_url": url,
+            "message": "Traitement lancé — GET /status/{task_id}"}
+
+
 @app.post("/analyze")
 async def analyze(background_tasks: BackgroundTasks,
                   file: UploadFile = File(...)):
@@ -113,6 +170,7 @@ async def analyze(background_tasks: BackgroundTasks,
     background_tasks.add_task(run_pipeline, tid)
     return {"task_id": tid, "filename": file.filename,
             "message": "Traitement lancé — GET /status/{task_id}"}
+
 
 
 @app.get("/status/{task_id}")
