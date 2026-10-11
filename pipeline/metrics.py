@@ -87,19 +87,43 @@ class MetricsCalculator:
                     best_d, best_id = d, p["track_id"]
         return best_id
 
-    def get_summary(self) -> dict:
+    def get_summary(self, tracker=None) -> dict:
         total_poss = max(sum(self.metrics.possession_frames.values()), 1)
         poss_a = self.metrics.possession_frames.get(0,0) / total_poss * 100
         poss_b = self.metrics.possession_frames.get(1,0) / total_poss * 100
 
+        # Filtrer pour ne garder que les vrais joueurs (11 vs 11 = ~22 joueurs + remplaçants)
+        # Éliminer les IDs fantômes qui n'ont apparu que quelques frames
+        valid_candidates = []
+        for tid, team in self.metrics.player_teams.items():
+            frames_seen = 0
+            if tracker and tid in tracker.tracked_players:
+                frames_seen = tracker.tracked_players[tid].frames_seen
+            dist_km = round(self.metrics.distances_m.get(tid, 0) / 1000, 3)
+            spd_kmh = round(self.metrics.max_speeds_mps.get(tid, 0) * 3.6, 1)
+            valid_candidates.append({
+                "tid": str(tid),
+                "team_id": team,
+                "frames_seen": frames_seen,
+                "distance_km": dist_km,
+                "max_speed_kmh": min(spd_kmh, 36.0),  # Borne absolue physique humaine
+            })
+
+        # Trier par nombre de frames où le joueur est réellement présent sur le terrain
+        valid_candidates.sort(key=lambda x: (x["frames_seen"], x["distance_km"]), reverse=True)
+
+        # On garde au maximum les 24 joueurs les plus constants du match (11 vs 11 + marge)
+        top_players = valid_candidates[:24]
+
         players_stats = {
-            str(tid): {
-                "team_id":       team,
-                "distance_km":   round(self.metrics.distances_m.get(tid,0)/1000, 3),
-                "max_speed_kmh": round(self.metrics.max_speeds_mps.get(tid,0)*3.6, 1),
+            p["tid"]: {
+                "team_id":       p["team_id"],
+                "distance_km":   p["distance_km"],
+                "max_speed_kmh": p["max_speed_kmh"],
             }
-            for tid, team in self.metrics.player_teams.items()
+            for p in top_players
         }
+
         passes_list = [
             {"from": k[0], "to": k[1], "count": v}
             for k, v in sorted(self.metrics.pass_matrix.items(), key=lambda x:-x[1])[:20]

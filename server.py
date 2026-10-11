@@ -327,7 +327,7 @@ def run_pipeline(task_id: str) -> None:
             # 5. Métriques
             metrics.update(tracks, pitch_pos, tracker)
             if frame_idx % 30 == 0:
-                summary = metrics.get_summary()
+                summary = metrics.get_summary(tracker)
 
             # 6. Rendu visuel
             annotated = renderer.render_frame(
@@ -340,7 +340,7 @@ def run_pipeline(task_id: str) -> None:
         writer.release()
 
         set_progress(97, "Calcul des métriques finales...", TaskStatus.METRICS)
-        final_summary = metrics.get_summary()
+        final_summary = metrics.get_summary(tracker)
         final_summary["video_info"] = {
             "total_frames": frame_idx,
             "fps": fps,

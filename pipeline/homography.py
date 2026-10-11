@@ -12,21 +12,43 @@ from ultralytics import YOLO
 PITCH_W = 105.0
 PITCH_H = 68.0
 
-# 32 points du terrain en mètres (schema roboflow/sports)
+# 32 points réels du terrain officiel en mètres (spécification Roboflow SoccerPitchConfiguration)
+# Dimensions FIFA : longueur 105.0m (X), largeur 68.0m (Y)
 PITCH_KP_REAL = np.array([
-    [ 0.0,  0.0], [ 0.0, 34.0], [ 0.0, 68.0],
-    [ 5.5, 13.84],[ 5.5, 54.16],[ 5.5, 24.84],[ 5.5, 43.16],
-    [16.5, 13.84],[16.5, 54.16],[11.0, 34.0],
-    [52.5,  0.0], [52.5, 68.0], [52.5, 34.0],
-    [105.0,  0.0],[105.0,34.0], [105.0,68.0],
-    [99.5, 13.84],[99.5, 54.16],[99.5, 24.84],[99.5, 43.16],
-    [88.5, 13.84],[88.5, 54.16],[94.0, 34.0],
-    [ 0.0, 24.84],[ 0.0, 43.16],
-    [105.0,24.84],[105.0,43.16],
-    [16.5,  0.0], [16.5, 68.0],
-    [88.5,  0.0], [88.5, 68.0],
-    [52.5, 34.0],
+    [0.0, 0.0],       # 1 : coin haut gauche
+    [0.0, 13.84],     # 2 : ligne de but, intersection surface réparation haut
+    [0.0, 24.84],     # 3 : ligne de but, poteau gauche (surface 5.5m haut)
+    [0.0, 43.16],     # 4 : ligne de but, poteau droit (surface 5.5m bas)
+    [0.0, 54.16],     # 5 : ligne de but, intersection surface réparation bas
+    [0.0, 68.0],      # 6 : coin bas gauche
+    [5.5, 24.84],     # 7 : surface 5.5m coin haut gauche
+    [5.5, 43.16],     # 8 : surface 5.5m coin bas gauche
+    [11.0, 34.0],     # 9 : point de penalty gauche
+    [16.5, 13.84],    # 10: grande surface coin haut gauche
+    [16.5, 24.84],    # 11: grande surface aligné poteau haut
+    [16.5, 43.16],    # 12: grande surface aligné poteau bas
+    [16.5, 54.16],    # 13: grande surface coin bas gauche
+    [52.5, 0.0],      # 14: ligne médiane touche haut
+    [52.5, 24.85],    # 15: rond central intersection médiane haut
+    [52.5, 43.15],    # 16: rond central intersection médiane bas
+    [52.5, 68.0],     # 17: ligne médiane touche bas
+    [88.5, 13.84],    # 18: grande surface droite coin haut
+    [88.5, 24.84],    # 19: grande surface droite aligné poteau haut
+    [88.5, 43.16],    # 20: grande surface droite aligné poteau bas
+    [88.5, 54.16],    # 21: grande surface droite coin bas
+    [94.0, 34.0],     # 22: point de penalty droite
+    [99.5, 24.84],    # 23: surface 5.5m droite coin haut
+    [99.5, 43.16],    # 24: surface 5.5m droite coin bas
+    [105.0, 0.0],     # 25: coin haut droit
+    [105.0, 13.84],   # 26: ligne de but droite, surface réparation haut
+    [105.0, 24.84],   # 27: ligne de but droite, poteau haut
+    [105.0, 43.16],   # 28: ligne de but droite, poteau bas
+    [105.0, 54.16],   # 29: ligne de but droite, surface réparation bas
+    [105.0, 68.0],    # 30: coin bas droit
+    [43.35, 34.0],    # 31: sommet gauche du rond central
+    [61.65, 34.0],    # 32: sommet droit du rond central
 ], dtype=np.float32)
+
 
 
 class PitchHomography:

@@ -23,25 +23,27 @@ class TrackedObject:
 
 
 class FootballTracker:
-    """ByteTrack pour le football. Instances séparées par catégorie."""
+    """ByteTrack pour le football avec persistance forte des IDs."""
 
-    def __init__(self, frame_rate: float = 25.0, track_thresh: float = 0.45,
-                 track_buffer: int = 30, match_thresh: float = 0.8):
+    def __init__(self, frame_rate: float = 25.0, track_thresh: float = 0.50,
+                 track_buffer: int = 90, match_thresh: float = 0.70):
         self.fps = frame_rate
+        # track_buffer à 90 frames (~3-4s) pour qu'un joueur masqué ou en bordure garde son ID
         kw = dict(track_activation_threshold=track_thresh,
                   lost_track_buffer=track_buffer,
                   minimum_matching_threshold=match_thresh,
                   frame_rate=int(frame_rate))
         self.player_tracker  = ByteTrack(**kw)
         self.referee_tracker = ByteTrack(**kw)
-        self.ball_tracker    = ByteTrack(track_activation_threshold=0.3,
-                                         lost_track_buffer=15,
-                                         minimum_matching_threshold=0.7,
+        self.ball_tracker    = ByteTrack(track_activation_threshold=0.35,
+                                         lost_track_buffer=30,
+                                         minimum_matching_threshold=0.65,
                                          frame_rate=int(frame_rate))
         self.tracked_players:  dict[int, TrackedObject] = {}
         self.tracked_referees: dict[int, TrackedObject] = {}
         self.ball_track: TrackedObject | None = None
         self.frame_count = 0
+
 
     @staticmethod
     def _to_sv(dets: list[dict], cls_override: int | None = None) -> Detections:
@@ -123,17 +125,40 @@ class FootballTracker:
         if track_id not in store:
             return
         obj = store[track_id]
+        
+        # Filtre anti-téléportation / homographie aberrante :
+        # Un joueur ne peut pas se déplacer de plus de 2.0 mètres entre deux frames consécutives (soit > 50-60 km/h)
+        if len(obj.positions) >= 1:
+            prev_x, prev_y = obj.positions[-1]
+            dx = xy[0] - prev_x
+            dy = xy[1] - prev_y
+            step_m = (dx**2 + dy**2)**0.5
+            max_step_per_frame = (10.0 / self.fps)  # max ~36 km/h = 10 m/s
+            if step_m > max_step_per_frame:
+                # Saut anormal (artefact homographie) : ignorer la position aberrante
+                return
+            spd_mps = step_m * self.fps
+            obj.speeds_mps.append(spd_mps)
+
         obj.positions.append(xy)
-        if len(obj.positions) >= 2:
-            dx = obj.positions[-1][0] - obj.positions[-2][0]
-            dy = obj.positions[-1][1] - obj.positions[-2][1]
-            obj.speeds_mps.append(((dx**2+dy**2)**0.5) * self.fps)
 
     def get_distance(self, track_id: int) -> float:
         pos = self.tracked_players.get(track_id, TrackedObject(0, 0)).positions
-        return sum(((pos[i][0]-pos[i-1][0])**2+(pos[i][1]-pos[i-1][1])**2)**0.5
-                   for i in range(1, len(pos)))
+        if len(pos) < 2:
+            return 0.0
+        tot = 0.0
+        for i in range(1, len(pos)):
+            d = ((pos[i][0]-pos[i-1][0])**2 + (pos[i][1]-pos[i-1][1])**2)**0.5
+            tot += d
+        return tot
 
     def get_max_speed(self, track_id: int) -> float:
         sp = self.tracked_players.get(track_id, TrackedObject(0, 0)).speeds_mps
-        return max(sp) if sp else 0.0
+        if not sp:
+            return 0.0
+        # Utiliser un quantile 95% pour éliminer les micro-sauts isolés
+        sp_filtered = [s for s in sp if s <= 10.0]  # max 36 km/h (record Mbappe ~36 km/h)
+        if not sp_filtered:
+            return 0.0
+        return float(np.percentile(sp_filtered, 95))
+
