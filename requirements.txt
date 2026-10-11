@@ -1,0 +1,28 @@
+# requirements.txt — Football Analytics System
+# Installation : pip install -r requirements.txt
+# Note : PyTorch CUDA doit être installé séparément (voir INSTALL_WINDOWS.md)
+
+# Deep Learning & Computer Vision
+ultralytics==8.3.0
+supervision==0.25.0
+opencv-python==4.10.0.84
+
+# Serveur API
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.12
+aiofiles==24.1.0
+
+# Data Science
+numpy==1.26.4
+scipy==1.14.1
+scikit-learn==1.5.2
+matplotlib==3.9.2
+pillow==10.4.0
+
+# Utilitaires
+huggingface-hub==0.26.0
+tqdm==4.67.0
+
+# PyTorch CUDA 12.8 (Windows) — installer manuellement :
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128

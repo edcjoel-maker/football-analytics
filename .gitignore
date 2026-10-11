@@ -1,0 +1,32 @@
+# Environnement virtuel Python
+venv/
+.venv/
+env/
+
+# Modèles IA (trop lourds pour git — téléchargés via download_models.py)
+models/*.pt
+models/*.pth
+models/*.onnx
+
+# Vidéos uploadées et sorties générées
+uploads/
+outputs/
+
+# Cache Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
