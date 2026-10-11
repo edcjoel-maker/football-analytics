@@ -14,11 +14,13 @@ import torch
 import numpy as np
 from ultralytics import YOLO
 
-# IDs des classes dans player_detection.pt
-CLASS_PLAYER     = 0
-CLASS_GOALKEEPER = 1
-CLASS_REFEREE    = 2
-CLASS_BALL_PLAYER = 3
+# IDs des classes réelles dans player_detection.pt :
+# {0: 'ball', 1: 'goalkeeper', 2: 'player', 3: 'referee'}
+CLASS_BALL_PLAYER = 0
+CLASS_GOALKEEPER  = 1
+CLASS_PLAYER      = 2
+CLASS_REFEREE     = 3
+
 
 # Seuils de confiance
 CONF_PLAYERS = 0.4

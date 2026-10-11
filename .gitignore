@@ -1,32 +1,19 @@
-# Environnement virtuel Python
+# Python & venv
 venv/
-.venv/
-env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
 
-# Modèles IA (trop lourds pour git — téléchargés via download_models.py)
-models/*.pt
-models/*.pth
-models/*.onnx
-
-# Vidéos uploadées et sorties générées
+# Data & outputs
 uploads/
 outputs/
 
-# Cache Python
-__pycache__/
-*.py[cod]
-*.pyo
-.pytest_cache/
+# Large model weights (téléchargeables via download_models.py)
+models/*.pt
 
-# Fichiers système
+# OS & IDE
 .DS_Store
 Thumbs.db
-desktop.ini
-
-# IDE
 .vscode/
 .idea/
-*.swp
-
-# Logs
-*.log
