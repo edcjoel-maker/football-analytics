@@ -36,7 +36,7 @@ class FootballDetector:
         player_model_path: str = "models/player_detection.pt",
         ball_model_path:   str = "models/ball_detection.pt",
         device: str | None = None,
-        use_fp16: bool = True,
+        use_fp16: bool = False,
     ):
         if device is None:
             if torch.cuda.is_available():
@@ -48,12 +48,11 @@ class FootballDetector:
         else:
             self.device = device
 
-        self.use_fp16 = use_fp16 and self.device == "cuda"
+        self.use_fp16 = False  # Désactivé pour éviter les conflits Half vs Float
 
         print(f"[Detector] Device : {self.device.upper()}")
         if self.device == "cuda":
             print(f"[Detector] GPU    : {torch.cuda.get_device_name(0)}")
-            print(f"[Detector] FP16   : {self.use_fp16}")
         elif self.device == "mps":
             print("[Detector] GPU    : Apple Silicon (MPS)")
 
@@ -61,10 +60,6 @@ class FootballDetector:
         self.ball_model   = YOLO(ball_model_path)
         self.player_model.to(self.device)
         self.ball_model.to(self.device)
-
-        if self.use_fp16:
-            self.player_model.model.half()
-            self.ball_model.model.half()
 
         print("[Detector] Modèles chargés.")
 

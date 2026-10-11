@@ -36,7 +36,7 @@ class PitchHomography:
     """
 
     def __init__(self, model_path: str = "models/pitch_keypoints.pt",
-                 device: str | None = None, use_fp16: bool = True,
+                 device: str | None = None, use_fp16: bool = False,
                  update_every: int = 30, min_keypoints: int = 6):
         if device is None:
             if torch.cuda.is_available():
@@ -48,13 +48,11 @@ class PitchHomography:
         else:
             self.device = device
 
-        self.use_fp16 = use_fp16 and self.device == "cuda"
+        self.use_fp16 = False  # Désactivé pour éviter struct c10::Half != float dans la tête keypoints
         self.update_every = update_every
         self.min_kp   = min_keypoints
         self.model    = YOLO(model_path)
         self.model.to(self.device)
-        if self.use_fp16:
-            self.model.model.half()
         self.H: np.ndarray | None = None
         self.frame_count = 0
         print("[Homography] Modèle keypoints chargé.")
