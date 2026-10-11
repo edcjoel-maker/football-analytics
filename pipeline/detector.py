@@ -39,7 +39,12 @@ class FootballDetector:
         use_fp16: bool = True,
     ):
         if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                self.device = "mps"
+            else:
+                self.device = "cpu"
         else:
             self.device = device
 
@@ -49,6 +54,8 @@ class FootballDetector:
         if self.device == "cuda":
             print(f"[Detector] GPU    : {torch.cuda.get_device_name(0)}")
             print(f"[Detector] FP16   : {self.use_fp16}")
+        elif self.device == "mps":
+            print("[Detector] GPU    : Apple Silicon (MPS)")
 
         self.player_model = YOLO(player_model_path)
         self.ball_model   = YOLO(ball_model_path)

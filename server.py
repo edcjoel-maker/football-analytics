@@ -18,7 +18,7 @@ import cv2
 import torch
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import aiofiles
 
@@ -64,15 +64,29 @@ app = FastAPI(title="Football Analytics API", version="1.0.0",
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 
+# ─── Interface Web ────────────────────────────────────────────────────────────
+STATIC_DIR = BASE_DIR / "static"
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def serve_ui():
+    """Sert la page web de l'interface utilisateur."""
+    html_path = STATIC_DIR / "index.html"
+    async with aiofiles.open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=await f.read())
+
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
-    gpu = torch.cuda.is_available()
+    cuda = torch.cuda.is_available()
+    mps = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    gpu = cuda or mps
+    gpu_name = torch.cuda.get_device_name(0) if cuda else ("Apple Silicon (MPS)" if mps else None)
     return {"status": "ok", "gpu_available": gpu,
-            "gpu_name": torch.cuda.get_device_name(0) if gpu else None,
-            "cuda_version": torch.version.cuda,
+            "gpu_name": gpu_name,
+            "device_type": "cuda" if cuda else ("mps" if mps else "cpu"),
+            "cuda_version": getattr(torch.version, "cuda", None),
             "active_tasks": len([t for t in TASKS.values()
                                   if t["status"] not in (TaskStatus.DONE, TaskStatus.ERROR)])}
 
@@ -291,5 +305,9 @@ def run_pipeline(task_id: str) -> None:
         task["step"]   = f"Erreur : {exc}"
         log.error(f"[{task_id}] ❌ Erreur pipeline : {traceback.format_exc()}")
 
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
 
 

@@ -38,7 +38,16 @@ class PitchHomography:
     def __init__(self, model_path: str = "models/pitch_keypoints.pt",
                  device: str | None = None, use_fp16: bool = True,
                  update_every: int = 30, min_keypoints: int = 6):
-        self.device   = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                self.device = "mps"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = device
+
         self.use_fp16 = use_fp16 and self.device == "cuda"
         self.update_every = update_every
         self.min_kp   = min_keypoints

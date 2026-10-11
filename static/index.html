@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Analytics</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0f14;--surface:#161a24;--surface2:#1e2334;--border:#2a3045;--accent:#00e5ff;--accent2:#ff6b35;--green:#00c853;--red:#ff1744;--yellow:#ffd600;--text:#e8ecf4;--muted:#6b7599;--radius:12px;--shadow:0 4px 24px rgba(0,0,0,.45)}
+body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;font-size:15px;min-height:100vh}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700}
+.logo span{color:var(--accent)}
+#gpu-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:13px;color:var(--muted)}
+#gpu-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
+#gpu-dot.online{background:var(--green);box-shadow:0 0 6px var(--green)}
+#gpu-dot.offline{background:var(--red)}
+main{max-width:1100px;margin:0 auto;padding:36px 24px 80px;display:grid;gap:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow)}
+.card-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:20px}
+#drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:52px 32px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+#drop-zone:hover,#drop-zone.dragover{border-color:var(--accent);background:rgba(0,229,255,.04)}
+#drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:48px;margin-bottom:12px}
+.drop-text{font-size:17px;font-weight:600;margin-bottom:6px}
+.drop-sub{color:var(--muted);font-size:13px}
+#file-name{margin-top:16px;padding:10px 16px;background:var(--surface2);border-radius:8px;font-size:14px;display:none;align-items:center;gap:10px}
+#file-name.show{display:flex}
+#btn-analyze{width:100%;margin-top:20px;padding:16px;background:linear-gradient(135deg,var(--accent),#0097a7);color:#000;font-size:16px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;transition:opacity .2s,transform .1s}
+#btn-analyze:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+#btn-analyze:disabled{opacity:.4;cursor:not-allowed}
+.btn-dl{flex:1;min-width:160px;padding:14px 20px;border-radius:var(--radius);border:none;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:opacity .2s,transform .1s}
+.btn-dl:hover{opacity:.85;transform:translateY(-1px)}
+.btn-dl.primary{background:linear-gradient(135deg,#00e5ff,#0097a7);color:#000}
+.btn-dl.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:border-color .2s}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
+#upload-bar-wrap{margin-top:14px;display:none}
+#upload-bar-wrap.show{display:block}
+.bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+.bar-track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .3s;background:linear-gradient(90deg,var(--accent),#0097a7)}
+#upload-bar-fill{width:0%}
+#processing-card{display:none}
+#processing-card.show{display:block}
+.task-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.task-id{font-family:monospace;font-size:12px;color:var(--muted);background:var(--surface2);padding:4px 10px;border-radius:6px}
+.status-badge{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.badge-queued{background:rgba(107,117,153,.2);color:var(--muted)}
+.badge-detecting,.badge-tracking,.badge-rendering,.badge-metrics{background:rgba(0,229,255,.15);color:var(--accent)}
+.badge-done{background:rgba(0,200,83,.15);color:var(--green)}
+.badge-error{background:rgba(255,23,68,.15);color:var(--red)}
+.progress-center{display:flex;flex-direction:column;align-items:center;gap:16px;margin:24px 0}
+.ring-wrap{position:relative;width:140px;height:140px}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--surface2);stroke-width:10}
+.ring-fill{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;stroke-dasharray:377;stroke-dashoffset:377;transition:stroke-dashoffset .6s ease;filter:drop-shadow(0 0 6px var(--accent))}
+.ring-pct{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:32px;font-weight:700;line-height:1}
+.ring-pct small{font-size:12px;color:var(--muted);font-weight:400}
+#step-label{font-size:15px;color:var(--muted);text-align:center;min-height:22px}
+.pipeline-steps{display:flex;justify-content:space-between;align-items:center;margin:20px 0 0;gap:4px}
+.step{flex:1;text-align:center;position:relative}
+.step::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--border);z-index:0}
+.step:last-child::after{display:none}
+.step-dot{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:2px solid var(--border);margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:13px;position:relative;z-index:1;transition:all .3s}
+.step-dot.active{border-color:var(--accent);background:rgba(0,229,255,.1);box-shadow:0 0 12px rgba(0,229,255,.3)}
+.step-dot.done{border-color:var(--green);background:rgba(0,200,83,.15)}
+.step-name{font-size:11px;color:var(--muted);margin-top:2px}
+#results-card{display:none}
+#results-card.show{display:block}
+.results-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px 20px}
+.stat-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+.stat-value{font-size:28px;font-weight:700;line-height:1}
+.poss-section{margin-bottom:28px}
+.poss-label-row{display:flex;justify-content:space-between;font-size:14px;font-weight:600;margin-bottom:8px}
+.poss-a{color:#ff6b35}.poss-b{color:#00e5ff}
+.poss-track{height:24px;background:var(--surface2);border-radius:12px;overflow:hidden;display:flex}
+.poss-fill-a{height:100%;background:linear-gradient(90deg,#ff6b35,#ff9800);border-radius:12px 0 0 12px;transition:width .8s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:12px;font-weight:700;color:#000;min-width:0}
+.poss-fill-b{height:100%;background:linear-gradient(90deg,#0097a7,#00e5ff);border-radius:0 12px 12px 0;flex:1;display:flex;align-items:center;padding-left:8px;font-size:12px;font-weight:700;color:#000}
+.heatmap-section{margin-bottom:28px}
+.heatmap-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.heatmap-wrap{background:var(--surface2);border-radius:10px;padding:16px}
+.heatmap-title{font-size:12px;font-weight:600;margin-bottom:10px;text-align:center}
+.heatmap-title.team-a{color:#ff6b35}.heatmap-title.team-b{color:#00e5ff}
+canvas.heatmap-canvas{width:100%;border-radius:6px;display:block}
+.players-section{margin-bottom:8px}
+.players-table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 14px;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid rgba(42,48,69,.6)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.team-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.team-a-dot{background:#ff6b35}.team-b-dot{background:#00e5ff}.ref-dot{background:#00c853}
+.speed-bar{height:4px;background:var(--border);border-radius:2px;margin-top:4px}
+.speed-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent2),var(--yellow))}
+.dl-row{display:flex;gap:12px;margin-top:24px;flex-wrap:wrap}
+#error-box{display:none;background:rgba(255,23,68,.08);border:1px solid rgba(255,23,68,.3);border-radius:10px;padding:16px 20px;color:var(--red);font-size:14px;margin-top:16px}
+#error-box.show{display:block}
+#history-card{display:none}
+#history-card.show{display:block}
+#history-list{display:flex;flex-direction:column;gap:10px}
+.history-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color .2s}
+.history-item:hover{border-color:var(--accent)}
+.history-item .fname{font-weight:600;font-size:14px}
+.history-item .finfo{font-size:12px;color:var(--muted);margin-top:2px}
+.history-actions{display:flex;gap:8px;flex-shrink:0}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 24px;font-size:14px;box-shadow:var(--shadow);transition:transform .3s;z-index:999;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:640px){header{padding:0 16px}main{padding:20px 16px 60px}.card{padding:20px}.heatmap-row{grid-template-columns:1fr}.step-name{font-size:9px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span style="font-size:28px">&#9917;</span>&nbsp;Football<span>Analytics</span></div>
+  <div id="gpu-badge"><div id="gpu-dot"></div><span id="gpu-label">Connexion...</span></div>
+</header>
+<main>
+  <div class="card">
+    <div class="card-title">&#128193; Importer une vid&#233;o</div>
+    <div id="drop-zone">
+      <input type="file" id="file-input" accept=".mp4,.avi,.mov,.mkv,.wmv">
+      <div class="drop-icon">&#127916;</div>
+      <div class="drop-text">Glisse ta vid&#233;o ici</div>
+      <div class="drop-sub">ou clique pour s&#233;lectionner &middot; MP4, AVI, MOV, MKV</div>
+    </div>
+    <div id="file-name"><span>&#128249;</span><span id="file-name-text"></span><span id="file-size" style="margin-left:auto;color:var(--muted);font-size:12px"></span></div>
+    <div id="upload-bar-wrap">
+      <div class="bar-label"><span>Envoi en cours...</span><span id="upload-pct-label">0%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="upload-bar-fill"></div></div>
+    </div>
+    <button id="btn-analyze" disabled>&#128640; Lancer l'analyse</button>
+    <div id="error-box"></div>
+  </div>
+  <div class="card" id="processing-card">
+    <div class="task-header">
+      <div class="card-title" style="margin:0">&#9881;&#65039; Traitement GPU</div>
+      <span id="status-badge" class="status-badge badge-queued">En attente</span>
+    </div>
+    <div class="task-id" id="task-id-label">&mdash;</div>
+    <div class="progress-center">
+      <div class="ring-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="ring-bg" cx="70" cy="70" r="60"/>
+          <circle class="ring-fill" cx="70" cy="70" r="60" id="ring-fill"/>
+        </svg>
+        <div class="ring-pct"><span id="pct-text">0</span><small>%</small></div>
+      </div>
+      <div id="step-label">Initialisation...</div>
+    </div>
+    <div class="pipeline-steps">
+      <div class="step"><div class="step-dot" id="sd-queued">&#9203;</div><div class="step-name">File</div></div>
+      <div class="step"><div class="step-dot" id="sd-detecting">&#128269;</div><div class="step-name">D&#233;tection</div></div>
+      <div class="step"><div class="step-dot" id="sd-tracking">&#127919;</div><div class="step-name">Tracking</div></div>
+      <div class="step"><div class="step-dot" id="sd-rendering">&#127912;</div><div class="step-name">Rendu</div></div>
+      <div class="step"><div class="step-dot" id="sd-metrics">&#128202;</div><div class="step-name">M&#233;triques</div></div>
+      <div class="step"><div class="step-dot" id="sd-done">&#9989;</div><div class="step-name">Termin&#233;</div></div>
+    </div>
+  </div>
+  <div class="card" id="results-card">
+    <div class="card-title">&#128202; R&#233;sultats du match</div>
+    <div class="results-grid" id="stats-grid"></div>
+    <div class="poss-section">
+      <div class="poss-label-row">
+        <span class="poss-a">&#11035; &#201;quipe A <span id="poss-a-pct">&mdash;</span></span>
+        <span class="poss-b"><span id="poss-b-pct">&mdash;</span> &#201;quipe B &#11035;</span>
+      </div>
+      <div class="poss-track">
+        <div class="poss-fill-a" id="poss-fill-a" style="width:50%"></div>
+        <div class="poss-fill-b" id="poss-fill-b"></div>
+      </div>
+    </div>
+    <div class="heatmap-section">
+      <div class="card-title">&#128293; Zones de pr&#233;sence</div>
+      <div class="heatmap-row">
+        <div class="heatmap-wrap"><div class="heatmap-title team-a">&#201;quipe A</div><canvas id="heatmap-a" class="heatmap-canvas" width="420" height="272"></canvas></div>
+        <div class="heatmap-wrap"><div class="heatmap-title team-b">&#201;quipe B</div><canvas id="heatmap-b" class="heatmap-canvas" width="420" height="272"></canvas></div>
+      </div>
+    </div>
+    <div class="players-section">
+      <div class="card-title">&#128095; Stats joueurs</div>
+      <div class="players-table-wrap">
+        <table><thead><tr><th>ID</th><th>&#201;quipe</th><th>Distance</th><th>Vitesse max</th></tr></thead><tbody id="players-tbody"></tbody></table>
+      </div>
+    </div>
+    <div class="dl-row">
+      <a id="dl-video" class="btn-dl primary" href="#" download>&#11015;&#65039; T&#233;l&#233;charger la vid&#233;o annot&#233;e</a>
+      <a id="dl-json"  class="btn-dl secondary" href="#" download>&#128196; Exporter les stats JSON</a>
+    </div>
+  </div>
+  <div class="card" id="history-card">
+    <div class="card-title">&#128338; Historique des analyses</div>
+    <div id="history-list"></div>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const API=window.location.origin;
+let currentTaskId=null,pollingTimer=null,selectedFile=null;
+const HK='fa_history';
+function $(i){return document.getElementById(i)}
+function fmtSize(b){return b>1e6?(b/1e6).toFixed(1)+' MB':(b/1e3).toFixed(0)+' KB'}
+function fmtDur(s){const m=Math.floor(s/60);return m?m+'m '+Math.round(s%60)+'s':Math.round(s)+'s'}
+function toast(msg,dur=3000){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
+async function checkGPU(){
+  try{
+    const r=await fetch(API+'/health');const d=await r.json();
+    const dot=$('gpu-dot'),lbl=$('gpu-label');
+    if(d.gpu_available){dot.className='online';lbl.textContent=d.gpu_name||'GPU OK';}
+    else{dot.className='offline';lbl.textContent='CPU uniquement';}
+  }catch{$('gpu-dot').className='offline';$('gpu-label').textContent='Serveur hors ligne';}
+}
+checkGPU();setInterval(checkGPU,15000);
+const dropZone=$('drop-zone'),fileInput=$('file-input');
+fileInput.addEventListener('change',e=>{if(e.target.files[0])setFile(e.target.files[0]);});
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('dragover');
+  if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0]);
+});
+function setFile(f){
+  selectedFile=f;$('file-name-text').textContent=f.name;
+  $('file-size').textContent=fmtSize(f.size);
+  $('file-name').classList.add('show');
+  $('btn-analyze').disabled=false;
+  $('error-box').classList.remove('show');
+}
+$('btn-analyze').addEventListener('click',startAnalysis);
+async function startAnalysis(){
+  if(!selectedFile)return;
+  $('btn-analyze').disabled=true;
+  $('error-box').classList.remove('show');
+  $('upload-bar-wrap').classList.add('show');
+  $('upload-bar-fill').style.width='0%';
+  $('upload-pct-label').textContent='0%';
+  const fd=new FormData();fd.append('file',selectedFile);
+  const xhr=new XMLHttpRequest();xhr.open('POST',API+'/analyze');
+  xhr.upload.addEventListener('progress',e=>{
+    if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);
+      $('upload-bar-fill').style.width=p+'%';
+      $('upload-pct-label').textContent=p+'%';}
+  });
+  xhr.onload=()=>{
+    $('upload-bar-wrap').classList.remove('show');
+    if(xhr.status===200){
+      const data=JSON.parse(xhr.responseText);currentTaskId=data.task_id;
+      showProcessing(currentTaskId);startPolling();
+      saveHistory(currentTaskId,selectedFile.name,selectedFile.size);
+    }else{showError('Erreur upload : '+xhr.statusText);$('btn-analyze').disabled=false;}
+  };
+  xhr.onerror=()=>{
+    $('upload-bar-wrap').classList.remove('show');
+    showError("Impossible de joindre le serveur. V\u00e9rifie qu'il est bien lanc\u00e9.");
+    $('btn-analyze').disabled=false;
+  };
+  xhr.send(fd);
+}
+function showProcessing(tid){
+  $('processing-card').classList.add('show');
+  $('task-id-label').textContent='ID : '+tid;
+  $('results-card').classList.remove('show');
+}
+const STEPS=['queued','detecting','tracking','rendering','metrics','done'];
+const LABELS={queued:'En attente',detecting:'D\u00e9tection YOLO',tracking:'Tracking ByteTrack',
+              rendering:'Rendu vid\u00e9o',metrics:'Calcul m\u00e9triques',done:'Termin\u00e9 \u2713',error:'Erreur'};
+function updateProgress(d){
+  const pct=d.progress||0,status=d.status,step=d.step||LABELS[status]||status;
+  $('ring-fill').style.strokeDashoffset=377-(pct/100*377);
+  $('pct-text').textContent=pct;
+  $('step-label').textContent=step;
+  const badge=$('status-badge');
+  badge.textContent=LABELS[status]||status;
+  badge.className='status-badge badge-'+status;
+  const ci=STEPS.indexOf(status);
+  STEPS.forEach((s,i)=>{
+    const dot=$('sd-'+s);if(!dot)return;
+    dot.className='step-dot';
+    if(i<ci)dot.classList.add('done');
+    if(i===ci)dot.classList.add('active');
+  });
+  if(status==='done'){clearInterval(pollingTimer);toast('\u2705 Analyse termin\u00e9e !',4000);fetchResults(currentTaskId);}
+  if(status==='error'){clearInterval(pollingTimer);showError(d.error||'Erreur inconnue');}
+}
+function startPolling(){
+  if(pollingTimer)clearInterval(pollingTimer);
+  pollingTimer=setInterval(async()=>{
+    try{const r=await fetch(API+'/status/'+currentTaskId);const d=await r.json();updateProgress(d);}catch{}
+  },1200);
+}
+async function fetchResults(tid){
+  try{const r=await fetch(API+'/results/'+tid);if(!r.ok)return;const d=await r.json();renderResults(d,tid);}catch{}
+}
+function renderResults(d,tid){
+  $('results-card').classList.add('show');
+  $('results-card').scrollIntoView({behavior:'smooth'});
+  const vi=d.video_info||{},poss=d.possession||{};
+  $('stats-grid').innerHTML=
+    '<div class="stat-box"><div class="stat-label">\u23f1 Dur\u00e9e analys\u00e9e</div><div class="stat-value">'+fmtDur(vi.duration_s||0)+'</div></div>'+
+    '<div class="stat-box"><div class="stat-label">\ud83c\udfac Frames trait\u00e9es</div><div class="stat-value">'+(vi.total_frames||0).toLocaleString()+'</div></div>'+
+    '<div class="stat-box"><div class="stat-label">\ud83d\udccf R\u00e9solution</div><div class="stat-value" style="font-size:20px">'+(vi.resolution||'&mdash;')+'</div></div>'+
+    '<div class="stat-box"><div class="stat-label">\ud83c\udfc3 Joueurs d\u00e9tect\u00e9s</div><div class="stat-value">'+Object.keys(d.players||{}).length+'</div></div>';
+  const pa=poss.team_a_pct||0,pb=poss.team_b_pct||0;
+  $('poss-a-pct').textContent=pa.toFixed(1)+'%';
+  $('poss-b-pct').textContent=pb.toFixed(1)+'%';
+  $('poss-fill-a').style.width=pa+'%';
+  if(d.heatmaps){drawHeatmap('heatmap-a',d.heatmaps.team_a,'#ff6b35');drawHeatmap('heatmap-b',d.heatmaps.team_b,'#00e5ff');}
+  const players=d.players||{};
+  const sorted=Object.entries(players).sort((a,b)=>(b[1].distance_km||0)-(a[1].distance_km||0));
+  const maxSpd=Math.max(...sorted.map(([,p])=>p.max_speed_kmh||0),1);
+  $('players-tbody').innerHTML=sorted.map(([id,p])=>{
+    const tn=p.team_id===0?'A':p.team_id===1?'B':'Arb.';
+    const dc=p.team_id===0?'team-a-dot':p.team_id===1?'team-b-dot':'ref-dot';
+    const sp=((p.max_speed_kmh||0)/maxSpd*100).toFixed(0);
+    return '<tr><td>#'+id+'</td><td><span class="team-dot '+dc+'"></span>\u00c9quipe '+tn+'</td>'+
+      '<td>'+(p.distance_km||0).toFixed(2)+' km</td>'+
+      '<td>'+(p.max_speed_kmh||0).toFixed(1)+' km/h<div class="speed-bar"><div class="speed-bar-fill" style="width:'+sp+'%"></div></div></td></tr>';
+  }).join('');
+  $('dl-video').href=API+'/video/'+tid;
+  $('dl-json').href='data:application/json,'+encodeURIComponent(JSON.stringify(d,null,2));
+  $('dl-json').download='football_results_'+tid.slice(0,8)+'.json';
+}
+function drawHeatmap(cid,matrix,color){
+  const canvas=$(cid);if(!canvas||!matrix||!matrix.length)return;
+  const ctx=canvas.getContext('2d'),rows=matrix.length,cols=matrix[0].length;
+  const W=canvas.width,H=canvas.height,cw=W/cols,ch=H/rows;
+  ctx.fillStyle='#1a5c1a';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;
+  ctx.strokeRect(10,10,W-20,H-20);
+  ctx.beginPath();ctx.moveTo(W/2,10);ctx.lineTo(W/2,H-10);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,30,0,Math.PI*2);ctx.stroke();
+  const hex=color.replace('#','');
+  const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+  for(let row=0;row<rows;row++)
+    for(let col=0;col<cols;col++){
+      const v=matrix[row][col]||0;if(v<0.01)continue;
+      ctx.fillStyle='rgba('+r+','+g+','+b+','+(v*0.75).toFixed(3)+')';
+      ctx.fillRect(col*cw,row*ch,cw+1,ch+1);
+    }
+}
+function showError(msg){
+  const box=$('error-box');box.textContent='\u274c '+msg;box.classList.add('show');
+  $('btn-analyze').disabled=false;
+}
+function saveHistory(tid,fname,fsize){
+  const h=getHistory();
+  h.unshift({tid,fname,fsize,date:new Date().toISOString()});
+  localStorage.setItem(HK,JSON.stringify(h.slice(0,20)));
+  renderHistory();
+}
+function getHistory(){try{return JSON.parse(localStorage.getItem(HK)||'[]');}catch{return [];}}
+function renderHistory(){
+  const h=getHistory();if(!h.length)return;
+  $('history-card').classList.add('show');
+  $('history-list').innerHTML=h.map(item=>
+    '<div class="history-item" onclick="loadTask(\''+item.tid+'\')">' +
+    '<div><div class="fname">\ud83d\udcf9 '+item.fname+'</div>'+
+    '<div class="finfo">'+fmtSize(item.fsize)+' \u00b7 '+new Date(item.date).toLocaleString()+'</div></div>'+
+    '<div class="history-actions">'+
+    '<a class="btn-sm" href="'+API+'/video/'+item.tid+'" download onclick="event.stopPropagation()">\u2b07\ufe0f Vid\u00e9o</a>'+
+    '<a class="btn-sm" href="'+API+'/results/'+item.tid+'" target="_blank" onclick="event.stopPropagation()">\ud83d\udcc4 JSON</a>'+
+    '</div></div>'
+  ).join('');
+}
+async function loadTask(tid){
+  currentTaskId=tid;showProcessing(tid);
+  const r=await fetch(API+'/status/'+tid);const d=await r.json();
+  updateProgress(d);if(d.status==='done')fetchResults(tid);else startPolling();
+}
+renderHistory();
+</script>
+</body>
+</html>
